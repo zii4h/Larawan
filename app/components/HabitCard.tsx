@@ -34,7 +34,6 @@ export default function HabitCard({ habit, checkins: initialCheckins, todayCheck
   function handleCheckin() {
     const nowChecked = !checked
     setChecked(nowChecked)
-    // Optimistically update the heatmap
     setCheckins(prev =>
       nowChecked ? [...prev, today] : prev.filter(d => d !== today)
     )
@@ -83,10 +82,16 @@ export default function HabitCard({ habit, checkins: initialCheckins, todayCheck
           ) : (
             <button
               onClick={() => setShowDelete(true)}
-              className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-zinc-400 transition-opacity text-xs"
+              className="text-zinc-600 hover:text-red-400 transition-all cursor-pointer"
               aria-label="Delete habit"
             >
-              ✕
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
             </button>
           )}
         </div>
@@ -100,8 +105,7 @@ export default function HabitCard({ habit, checkins: initialCheckins, todayCheck
       {/* Check-in button */}
       <button
         onClick={handleCheckin}
-        disabled={isPending}
-        className={`w-full py-3 rounded-xl font-medium text-sm transition-all ${
+        className={`w-full py-3 rounded-xl font-medium text-sm transition-all cursor-pointer ${
           checked
             ? 'text-white border-2'
             : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-2 border-transparent'

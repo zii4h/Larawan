@@ -8,14 +8,13 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch habits
   const { data: habits } = await supabase
     .from('habits')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: true })
 
-  // Fetch all checkins for this user (past year)
+  // fetch all checkins for this user (past year)
   const oneYearAgo = new Date()
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
   const { data: checkins } = await supabase
@@ -27,7 +26,7 @@ export default async function DashboardPage() {
   const now = new Date()
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
-  // Group checkins by habit
+  // group checkins by habit
   const checkinsByHabit: Record<string, string[]> = {}
   for (const c of checkins ?? []) {
     if (!checkinsByHabit[c.habit_id]) checkinsByHabit[c.habit_id] = []
@@ -55,7 +54,7 @@ export default async function DashboardPage() {
       </nav>
 
       {/* Content */}
-      <main className="max-w-5xl mx-auto px-6 py-10">
+      <main className="max-w-5xl mx-auto px-8 py-10">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-white">Your habits</h1>
           <p className="text-zinc-500 text-sm mt-1">

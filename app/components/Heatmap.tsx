@@ -3,11 +3,14 @@
 import { useMemo } from 'react'
 
 interface HeatmapProps {
-  checkins: string[]   // array of date strings "YYYY-MM-DD"
-  color: string        // hex color e.g. "#a855f7"
+  checkins: string[]
+  color: string
 }
 
-const WEEKS = 52
+// Total grid: 26 weeks on each side of today = 53 weeks wide
+const WEEKS_PAST = 26
+const WEEKS_FUTURE = 26
+const TOTAL_WEEKS = WEEKS_PAST + 1 + WEEKS_FUTURE
 const DAYS_PER_WEEK = 7
 
 function getDateString(date: Date): string {
@@ -31,54 +34,53 @@ export default function Heatmap({ checkins, color }: HeatmapProps) {
   const checkinSet = useMemo(() => new Set(checkins), [checkins])
   const rgb = useMemo(() => hexToRgb(color), [color])
 
-  // Build a grid: 52 weeks × 7 days, ending today
-  const { grid, monthPositions } = useMemo(() => {
+  const { grid, monthPositions, todayCol } = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const todayStr = getDateString(today)
 
-    // Find the Sunday that starts our 52-week window
-    const endSunday = new Date(today)
-    endSunday.setDate(today.getDate() + (6 - today.getDay())) // end of this week (Saturday)
+    // Start from WEEKS_PAST weeks ago (beginning of that week, Sunday)
+    const startDate = new Date(today)
+    startDate.setDate(today.getDate() - today.getDay() - WEEKS_PAST * 7)
 
-    const startDate = new Date(endSunday)
-    startDate.setDate(endSunday.getDate() - WEEKS * DAYS_PER_WEEK + 1)
-
-    const weeks: (string | null)[][] = []
+    const weeks: { dateStr: string; isFuture: boolean; isToday: boolean }[][] = []
     const monthPos: { label: string; col: number }[] = []
-    let seenMonths = new Set<string>()
+    const seenMonths = new Set<string>()
+    let todayCol = WEEKS_PAST
 
-    for (let w = 0; w < WEEKS; w++) {
-      const week: (string | null)[] = []
+    for (let w = 0; w < TOTAL_WEEKS; w++) {
+      const week: { dateStr: string; isFuture: boolean; isToday: boolean }[] = []
       for (let d = 0; d < DAYS_PER_WEEK; d++) {
         const date = new Date(startDate)
         date.setDate(startDate.getDate() + w * 7 + d)
-        if (date > today) {
-          week.push(null)
-        } else {
-          const ds = getDateString(date)
-          week.push(ds)
-          // Track month label position
-          const monthKey = `${date.getFullYear()}-${date.getMonth()}`
-          if (!seenMonths.has(monthKey) && date.getDate() <= 7) {
-            seenMonths.add(monthKey)
-            monthPos.push({ label: MONTH_LABELS[date.getMonth()], col: w })
-          }
+        const ds = getDateString(date)
+        const isFuture = date > today
+        const isToday = ds === todayStr
+
+        if (isToday) todayCol = w
+
+        week.push({ dateStr: ds, isFuture, isToday })
+
+        const monthKey = `${date.getFullYear()}-${date.getMonth()}`
+        if (!seenMonths.has(monthKey) && date.getDate() <= 7) {
+          seenMonths.add(monthKey)
+          monthPos.push({ label: MONTH_LABELS[date.getMonth()], col: w })
         }
       }
       weeks.push(week)
     }
 
-    return { grid: weeks, monthPositions: monthPos }
+    return { grid: weeks, monthPositions: monthPos, todayCol }
   }, [])
 
   const totalCheckins = checkins.length
 
   return (
     <div className="overflow-x-auto">
-      <div className="inline-block min-w-full">
+      <div className="inline-block">
         {/* Month labels */}
         <div className="flex mb-1 ml-8">
-          {Array.from({ length: WEEKS }).map((_, w) => {
+          {Array.from({ length: TOTAL_WEEKS }).map((_, w) => {
             const mp = monthPositions.find(m => m.col === w)
             return (
               <div key={w} className="w-[14px] mr-[2px] text-[10px] text-zinc-500 shrink-0">
@@ -102,22 +104,36 @@ export default function Heatmap({ checkins, color }: HeatmapProps) {
           <div className="flex gap-[2px]">
             {grid.map((week, w) => (
               <div key={w} className="flex flex-col gap-[2px]">
-                {week.map((dateStr, d) => {
-                  if (dateStr === null) {
-                    return <div key={d} className="w-[14px] h-[14px] rounded-sm" />
+                {week.map((cell, d) => {
+                  const filled = !cell.isFuture && checkinSet.has(cell.dateStr)
+
+                  let bgColor: string
+                  let opacity: number
+
+                  if (cell.isToday) {
+                    // Today: filled with color if checked in, else a dim outline
+                    bgColor = filled
+                      ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
+                      : 'rgb(39, 39, 42)'
+                    opacity = 1
+                  } else if (cell.isFuture) {
+                    // Future: same default color as empty past squares
+                    bgColor = 'rgb(39, 39, 42)'
+                    opacity = 1
+                  } else {
+                    // Past
+                    bgColor = filled
+                      ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
+                      : 'rgb(39, 39, 42)'
+                    opacity = 1
                   }
-                  const filled = checkinSet.has(dateStr)
+
                   return (
                     <div
                       key={d}
-                      title={dateStr}
-                      className="w-[14px] h-[14px] rounded-sm transition-opacity"
-                      style={{
-                        backgroundColor: filled
-                          ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
-                          : 'rgb(39, 39, 42)', // zinc-800
-                        opacity: filled ? 1 : 1,
-                      }}
+                      title={cell.dateStr}
+                      className={`w-[14px] h-[14px] rounded-sm transition-all ${cell.isToday ? 'ring-1 ring-white/20' : ''}`}
+                      style={{ backgroundColor: bgColor, opacity }}
                     />
                   )
                 })}
@@ -127,7 +143,7 @@ export default function Heatmap({ checkins, color }: HeatmapProps) {
         </div>
 
         <p className="text-xs text-zinc-500 mt-2 ml-8">
-          {totalCheckins} {totalCheckins === 1 ? 'day' : 'days'} shown in the past year
+          {totalCheckins} {totalCheckins === 1 ? 'day' : 'days'} · today is column {todayCol + 1} of {TOTAL_WEEKS}
         </p>
       </div>
     </div>
